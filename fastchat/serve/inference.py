@@ -84,7 +84,7 @@ def generate_stream(
     )
 
     # Print prompt
-    # print(f"PROMPT: {prompt}\n")
+    print(f"PROMPT: {prompt}\n")
     input_ids = tokenizer(prompt).input_ids
 
     if model.config.is_encoder_decoder:
@@ -246,8 +246,8 @@ def generate_stream(
         finish_reason = None
 
     # Print stream generated from inference
-    # print(f"GENERATE STREAM: {output}")
-    # print("-----------" * 50)
+    print(f"GENERATE STREAM: {output}")
+    print("-----------" * 50)
     yield {
         "text": output,
         "usage": {
@@ -276,7 +276,9 @@ def generate_special_stream(
     stream_interval: int = 2,
     judge_sent_end: bool = False,
 ):
+    print("im SPECIAL!!")
     prompt = params["prompt"]
+    model_path = params["model"]
     output_stream = generate_stream(
         model,
         tokenizer,
@@ -297,13 +299,35 @@ def generate_special_stream(
         # Use regex to fix prompt
         prompt = re.search(r".*?(?=ASSISTANT:)", prompt).group(0)
         # Make sure the prompt has the same format as the prompt in dataset
-        prompt = (
-            prompt
-            + "\nInput:\n"
-            + outputs
-            + new_outputs
-            + "\nFinal Answer:  ASSISTANT: "
-        )
+        if "peft" in model_path:
+            from peft import PeftConfig
+            config = PeftConfig.from_pretrained(model_path)
+            base_model_path = config.base_model_name_or_path
+            if "peft" in base_model_path:
+                raise ValueError(
+                    f"PeftModelAdapter cannot load a base model with 'peft' in the name: {config.base_model_name_or_path}"
+                )
+        else:
+            base_model_path = model_path
+        
+        base_model_path = base_model_path.lower()
+        if "vicuna" in base_model_path:
+            prompt = (
+                prompt
+                + "\nInput:\n"
+                + outputs
+                + new_outputs
+                + "\nFinal Answer:  ASSISTANT: "
+            )
+        elif "llama-2" in base_model_path:
+            prompt = {
+                prompt
+                + "\nInput:\n"
+                + outputs
+                + new_outputs
+                + "\nFinal Answer: [/INST] "
+            }
+
         params["prompt"] = prompt
         # Get the new inference result
         output_stream = generate_stream(
