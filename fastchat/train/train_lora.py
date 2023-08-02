@@ -28,7 +28,10 @@ import transformers
 from transformers import Trainer, BitsAndBytesConfig, deepspeed
 import torch
 
-from fastchat.train import (
+import sys
+sys.path.append(os.getcwd())
+
+from fastchat.train.train import (
     DataArguments,
     ModelArguments,
     make_supervised_data_module,
@@ -37,19 +40,6 @@ from fastchat.train import (
 from fastchat.train.llama_flash_attn_monkey_patch import (
     replace_llama_attn_with_flash_attn,
 )
-
-
-@dataclass
-class TrainingArguments(transformers.TrainingArguments):
-    cache_dir: typing.Optional[str] = field(default=None)
-    optim: str = field(default="adamw_torch")
-    model_max_length: int = field(
-        default=512,
-        metadata={
-            "help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."
-        },
-    )
-    flash_attn: bool = False
 
 
 @dataclass
@@ -128,10 +118,9 @@ def train():
     if training_args.flash_attn:
         replace_llama_attn_with_flash_attn()
 
-    device_map = None
+    device_map = "auto"
     world_size = int(os.environ.get("WORLD_SIZE", 1))
     ddp = world_size != 1
-    device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if ddp else None
     if lora_args.q_lora:
         device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if ddp else None
         if len(training_args.fsdp) > 0 or deepspeed.is_deepspeed_zero3_enabled():
@@ -145,11 +134,11 @@ def train():
         else (torch.bfloat16 if training_args.bf16 else torch.float32)
     )
 
+
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
         device_map=device_map,
-        torch_dtype=torch.float16,
         quantization_config=BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
@@ -159,6 +148,7 @@ def train():
         if lora_args.q_lora
         else None,
     )
+
     lora_config = LoraConfig(
         r=lora_args.lora_r,
         lora_alpha=lora_args.lora_alpha,
@@ -225,7 +215,7 @@ def train():
         )
 
     if training_args.local_rank == 0:
-        model.save_pretrained(training_args.output_dir, state_dict=state_dict)
+        model.save_pretrained(lora_args.lora_weight_path, state_dict=state_dict)
 
 
 if __name__ == "__main__":
