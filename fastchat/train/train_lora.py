@@ -29,6 +29,7 @@ from transformers import Trainer, BitsAndBytesConfig, deepspeed
 import torch
 
 import sys
+
 sys.path.append(os.getcwd())
 
 from fastchat.train.train import (
@@ -121,6 +122,7 @@ def train():
     device_map = "auto"
     world_size = int(os.environ.get("WORLD_SIZE", 1))
     ddp = world_size != 1
+    device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if ddp else None
     if lora_args.q_lora:
         device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if ddp else None
         if len(training_args.fsdp) > 0 or deepspeed.is_deepspeed_zero3_enabled():
@@ -134,11 +136,11 @@ def train():
         else (torch.bfloat16 if training_args.bf16 else torch.float32)
     )
 
-
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
         device_map=device_map,
+        torch_dtype=compute_dtype,
         quantization_config=BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
