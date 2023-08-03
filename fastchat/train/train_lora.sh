@@ -1,11 +1,11 @@
-deepspeed --num_gpus 6 fastchat/train/train_lora.py \
-    --model_name_or_path /media/2T_HDD1/minhvn/.cache/huggingface/hub/models--lmsys--vicuna-7b-v1.3/snapshots/RikkeiGPT-vicuna-7b-v1.3 \
+deepspeed --num_gpus 3 fastchat/train/train_lora.py \
+    --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --lora_r 8 \
     --lora_alpha 16 \
     --lora_dropout 0.05 \
     --data_path rikkei_train_clean.json \
     --eval_data_path rikkei_eval_clean.json \
-    --output_dir ./peft_lora_model \
+    --output_dir fastchat/train/vicuna_checkpoints \
     --num_train_epochs 150 \
     --fp16 True \
     --per_device_train_batch_size 2 \
@@ -27,4 +27,7 @@ deepspeed --num_gpus 6 fastchat/train/train_lora.py \
     --q_lora False \
     --deepspeed playground/deepspeed_config_s2.json \
     --gradient_checkpointing True \
-    --flash_attn False \
+    --flash_attn True \
+    --disable_tqdm False \
+    --lora_weight_path peft_lora_model_vicuna1.5_7b \
+    --load_best_model_at_end True
